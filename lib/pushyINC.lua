@@ -9,7 +9,7 @@
 local midi_out = midi.connect(2)
 local midi_in = midi.connect(2)
 
-local sliderChars = {empty=6,left=3,right=4,center=124}
+local sliderChars = {empty=6,left=3,right=4,center=5}
 
 local lcdLines = {
   {
@@ -93,7 +93,6 @@ local function setupEmptyLine(lineNumber)
 end
 
 local function setEmptyScreen()
-  print("trying to set screen empty")
   for i=1,4,1 do
       setupEmptyLine(i)
       lcdLines[i].dirty = true
@@ -138,13 +137,15 @@ local function lcdRedraw(line)
     end
     lcdLines[line].elementsMoved = false
   end
+
   for i,v in ipairs(sliders) do
     if (sliders[i].line == line and sliders[i].dirty)  then
       sliders[i]:redraw()
       sliders[i].dirty = false
     end
   end
-    for i,v in ipairs(texts) do
+
+  for i,v in ipairs(texts) do
     if (texts[i].line == line and texts[i].dirty)  then
       texts[i]:redraw()
       texts[i].dirty = false
@@ -269,6 +270,9 @@ function pushyLib.Slider:redraw()
 
     pos = pos + 1
   end
+
+  lcdLines[self.line].dirty = true
+  pushScreenDirty = true
   self.dirty = false
 end
 
@@ -292,6 +296,7 @@ function pushyLib.text.new(x, entry, line, width, height)
   lcdLines[line].dirty = true
   setmetatable(pushyLib.text, {__index = UI})
   setmetatable(text, pushyLib.text)
+
   return text
 end
 
@@ -310,9 +315,10 @@ function pushyLib.text:redraw()
 
     if charVal > 127 then charval = 1 end
 
-    lcdLines[self.line].message[i]= charVal
+    lcdLines[self.line].message[i] = charVal
     pos = pos + 1
   end
+  lcdLines[self.line].dirty = true
   self.dirty = false
 end
 
@@ -340,15 +346,18 @@ local function pushMidiCallBackHandler(data)
         delta = -1 * (math.floor((message.val - 64)/math.abs(message.val - 64))* (64 - math.abs(message.val - 64))) --yeah i know
         enc(message.cc, delta)
       -- handle key presses
-      else if (message.cc == 3 or message.cc == 9 or message.cc == 28 or message.cc == 29)
+      else if (message.cc == 3 or message.cc == 9)
+        or (message.cc >= 20 and message.cc <= 29)
         or (message.cc >= 36 and message.cc <= 63)
         or (message.cc >= 85 and message.cc <= 90)
-        or (message.cc >= 110 and message.cc <= 119) then
+        or (message.cc >= 102 and message.cc <= 119) then
         val = 0
         if message.val > 0 then
           val = 1
         end
         key(message.cc, val)
+      else
+        print(message.cc, message.val)
       end
     end
   end
@@ -361,8 +370,14 @@ local function pushMidiCallBackHandler(data)
         val = 1
       end
       key(message.note, val)
+    else
+      print('note:', message.note)
     end
   end
+end
+
+function pushyLib:setKey(key, val)
+  send_sysex(midi_out, {0x90, key, val})
 end
 
 function testNumberParamAction(paramid)
@@ -375,14 +390,13 @@ end
 function pushyLib.init()
 
   midi_in.event = pushMidiCallBackHandler
-  pushyLib.countParams()
-  print("there are " .. numberOfParams .. " params.")
+  -- pushyLib.countParams()
+  -- print("there are " .. numberOfParams .. " params.")
   --pushyLib.printParams() --early tests in working with params TODO remove when finished
 
-  sliders[1] = pushyLib.Slider.new(1, 1, 68, 1, 1, 1, 204, nil)
-  texts[1] = pushyLib.text.new(1,params:get("frequency"), 3, 17, 1)
+  -- texts[1] = pushyLib.text.new(1,params:get("frequency"), 3, 17, 1)
   --texts[1].entry = "a test so long that it carelessly leaves the screen!!!!!!!!"
-  texts[2] = pushyLib.text.new(18,params:get_id(currentParamID), 3, 17, 1)
+  -- texts[2] = pushyLib.text.new(18,params:get_id(currentParamID), 3, 17, 1)
 
 
   params:set_action("note_number", function(x) testNumberParamAction("note_number") end)
@@ -403,11 +417,21 @@ function pushyLib.init()
       lcdLines[lineToBeRefreshed].dirty = false
       lcdRedraw(lineToBeRefreshed)
     end
-  lineToBeRefreshed = lineToBeRefreshed + 1
-  if lineToBeRefreshed > 4 then lineToBeRefreshed = 1 end
+    lineToBeRefreshed = lineToBeRefreshed + 1
+    if lineToBeRefreshed > 4 then lineToBeRefreshed = 1 end
   end
   screen_refresh_metro:start(1 / PUSH_SCREEN_FRAMERATE)
+
   setEmptyScreen()
+  -- writeAllChars()
+
+  for i = 0, 62 do
+    pushyLib:setKey(36 + i, 0)
+  end
+end
+
+function pushyLib:sysex(msg)
+  send_sysex(midi_out, msg)
 end
 
 
