@@ -15,11 +15,19 @@ function init()
 
   --set up dummy params to display and edit with the push
   initParams() --in setupDemoParams.lua
-  
+
   --sets up the pushy library
   --you must have all params added before calling this init() (for now)
   pushyLib.init()
-  
+
   --rest of init would go here, but this is a very simple example so nothing is here yet.
 
+end
+
+function enc(num, d)
+  print('enc:', num, d)
+end
+
+function key(num, v)
+  print('key:', num, v)
 end

@@ -6,12 +6,26 @@
 -- To change this template use File | Settings | File Templates.
 --
 
-local midi_out = midi.connect(1)
+local midi_out = midi.connect(2)
 local midi_in = midi.connect(2)
 
 local sliderChars = {empty=6,left=3,right=4,center=124}
 
-local lcdLines = {{dirty=true, elementsMoved = false, message={}},{dirty=true, elementsMoved = false, message={}},{dirty=true, elementsMoved = false, message={}},{dirty=true, elementsMoved = false, message={}} }
+local lcdLines = {
+  {
+    dirty=true, elementsMoved = false, message={}
+  },
+  {
+    dirty=true, elementsMoved = false, message={}
+  },
+  {
+    dirty=true, elementsMoved = false, message={}
+  },
+  {
+    dirty=true, elementsMoved = false, message={}
+  }
+}
+
 local sliders = {}
 local texts = {}
 local lineToBeRefreshed = 1 -- the screen cant be updated all at once so instead of adding logic to wait before sending the next line we will just do it like this
@@ -56,24 +70,24 @@ end
 
 local ParamSetTYPES = {
 [0] = "tSEPARATOR",
-"tNUMBER",
-"tOPTION",
-"tCONTROL",
-"tFILE",
-"tTAPER",
-"tTRIGGER",
-"tGROUP",
-"tTEXT",
-"tBINARY",
-"sets"
+  "tNUMBER",
+  "tOPTION",
+  "tCONTROL",
+  "tFILE",
+  "tTAPER",
+  "tTRIGGER",
+  "tGROUP",
+  "tTEXT",
+  "tBINARY",
+  "sets"
  }
 
 local function setupEmptyLine(lineNumber)
   header = {71, 127, 21, (23 + lineNumber), 0, 69, 0}
   for i=1,7,1 do
     lcdLines[lineNumber].message[i]=header[i]
-  end  
-  for i=8,75,1 do 
+  end
+  for i=8,75,1 do
     lcdLines[lineNumber].message[i]=32
   end
 end
@@ -102,16 +116,16 @@ function pushyLib.printParams()
     for i, v in ipairs(params.params) do
     id = params:get_id(i)
     if id == nil then id = 'nil' end --because you cant use concatination operator on nil
-     
+
     value = params:get(i)
     if value == nil then value = 'nil' end --because you cant use concatination operator on nil
     print(i)
     print(i .. ' ' .. id .. ' type number '.. params:t(i) .. 'type string ' .. ParamSetTYPES[params:t(i)] .. ' ' .. params:string(i) .. ' ' .. value .. ' ' )
-        
-        
+
+
     if params:get_id(i) ~= nil then
       print('what?')
-      --params:get_raw(i):print() 
+      --params:get_raw(i):print()
       end
     end
 end
@@ -123,7 +137,7 @@ local function lcdRedraw(line)
       if (sliders[i].line == line) then sliders[i].dirty = true end
     end
     lcdLines[line].elementsMoved = false
-  end  
+  end
   for i,v in ipairs(sliders) do
     if (sliders[i].line == line and sliders[i].dirty)  then
       sliders[i]:redraw()
@@ -140,44 +154,45 @@ local function lcdRedraw(line)
   send_sysex(midi_out, lcdLines[line].message)
 end
 
---this breaks out 
-local function enc(n, delta)
-  print("encoder number:" .. n .. " Delta:" .. delta)
-  
-  --the encoders at the top are cc numbers 71-79 numbered from left to right (79 is the extra one)
-  --the two smaller encoders are numbers 14 and 15 also left to right
-  if n == 71 then
-    sliders[1]:set_value_delta(delta)
-    lcdLines[sliders[1].line].dirty = true
-  end
-  -- removing this because i dont want the sliders to overlap
-  -- esm todo add a max width for the sliders so that overlap isnt a thing
-  -- if n == 72 then
-  --   sliders[1]:changeWidth(delta)
-  --   lcdLines[sliders[1].line].dirty = true
-  -- end
-  if n == 14 then
-    nextID = currentParamID + delta
-    if nextID >= numberOfParams then nextID = numberOfParams end
-    if nextID <= 1 then nextID = 1 end
-    currentParamID = nextID
-    texts[2].entry = params:get_id(currentParamID)
-    texts[2].dirty = true
-    lcdLines[texts[2].line].dirty = true
-    pushScreenDirty = true
-  end
-end
-
-local function key(n, val)
-  if (n == 2 and val == 1) then setEmptyScreen() end
-  if (n == 3 and val == 1) then writeAllChars() end
-end
+--this breaks out
+-- local function enc(n, delta)
+--   print("encoder number:" .. n .. " Delta:" .. delta)
+--
+--   --the encoders at the top are cc numbers 71-79 numbered from left to right (79 is the extra one)
+--   --the two smaller encoders are numbers 14 and 15 also left to right
+--   if n == 71 then
+--     sliders[1]:set_value_delta(delta)
+--     lcdLines[sliders[1].line].dirty = true
+--   end
+--   -- removing this because i dont want the sliders to overlap
+--   -- esm todo add a max width for the sliders so that overlap isnt a thing
+--   -- if n == 72 then
+--   --   sliders[1]:changeWidth(delta)
+--   --   lcdLines[sliders[1].line].dirty = true
+--   -- end
+--   if n == 14 then
+--     nextID = currentParamID + delta
+--     if nextID >= numberOfParams then nextID = numberOfParams end
+--     if nextID <= 1 then nextID = 1 end
+--     currentParamID = nextID
+--     texts[2].entry = params:get_id(currentParamID)
+--     texts[2].dirty = true
+--     lcdLines[texts[2].line].dirty = true
+--     pushScreenDirty = true
+--   end
+-- end
+--
+-- local function key(n, val)
+--   if (n == 2 and val == 1) then setEmptyScreen() end
+--   if (n == 3 and val == 1) then writeAllChars() end
+-- end
 
 -------- Slider --------
 --this section pertains to drawing a slider on the push screen
 
 --attempting to be as close to UI.Slider as possible
---changing the value of a slider wont update the message for the dirty line untill the the lcddraw event.
+--changing the value of a slider wont update the message for the dirty line
+--until the the lcddraw event.
 pushyLib.Slider = {}
 pushyLib.Slider.__index = pushyLib.Slider
 
@@ -192,7 +207,7 @@ function pushyLib.Slider.new(x, line, width, height, value, min_value, max_value
     max_value = max_value or 1,
     markers = markers or {},
     active = true,
-    dirty = true 
+    dirty = true
   }
   setmetatable(pushyLib.Slider, {__index = UI})
   setmetatable(slider, pushyLib.Slider)
@@ -237,9 +252,9 @@ function pushyLib.Slider:redraw()
   --print("on char: " .. onChar)
   --print("incharlen: " .. inCharicterlengths)
   --print("value: " .. self.value)
-  
+
   local pos = 1
-  
+
   for i=(7 + self.x),(6 + self.x + self.width),1 do
     if pos == onChar then
       if partials == 1 then
@@ -272,7 +287,7 @@ function pushyLib.text.new(x, entry, line, width, height)
     width = width or 17,
     height = height or 1,
     active = true,
-    dirty = true 
+    dirty = true
   }
   lcdLines[line].dirty = true
   setmetatable(pushyLib.text, {__index = UI})
@@ -282,7 +297,7 @@ end
 
 --- Redraw text block. --Call when changed.
 function pushyLib.text:redraw()
-  
+
   local pos = 1
   local charVal
   for i=(7 + self.x),(6 + self.x + self.width),1 do
@@ -292,9 +307,9 @@ function pushyLib.text:redraw()
     else
     charVal = 32
     end
-    
+
     if charVal > 127 then charval = 1 end
-    
+
     lcdLines[self.line].message[i]= charVal
     pos = pos + 1
   end
@@ -319,24 +334,46 @@ end
 
 local function pushMidiCallBackHandler(data)
     message = midi.to_msg(data)
-    print(message.val)
     if message.type == "cc" then
+      -- handle turn of encoders
       if ((message.cc >= 71 and message.cc <= 79) or (message.cc == 14 or message.cc == 15)) then
         delta = -1 * (math.floor((message.val - 64)/math.abs(message.val - 64))* (64 - math.abs(message.val - 64))) --yeah i know
         enc(message.cc, delta)
+      -- handle key presses
+      else if (message.cc == 3 or message.cc == 9 or message.cc == 28 or message.cc == 29)
+        or (message.cc >= 36 and message.cc <= 63)
+        or (message.cc >= 85 and message.cc <= 90)
+        or (message.cc >= 110 and message.cc <= 119) then
+        val = 0
+        if message.val > 0 then
+          val = 1
+        end
+        key(message.cc, val)
       end
     end
+  end
+
+  -- handle touch of encoders
+  if message.type == "note_on" or message.type == "note_off" then
+    if message.note >= 0 and message.note <= 10 then
+      val = 0
+      if message.vel > 0 then
+        val = 1
+      end
+      key(message.note, val)
+    end
+  end
 end
 
 function testNumberParamAction(paramid)
-  
+
     --this function is called when a parameter value is changed (doesnt mater from where)
     print(paramid)
-    
+
 end
 
 function pushyLib.init()
-  
+
   midi_in.event = pushMidiCallBackHandler
   pushyLib.countParams()
   print("there are " .. numberOfParams .. " params.")
@@ -346,14 +383,14 @@ function pushyLib.init()
   texts[1] = pushyLib.text.new(1,params:get("frequency"), 3, 17, 1)
   --texts[1].entry = "a test so long that it carelessly leaves the screen!!!!!!!!"
   texts[2] = pushyLib.text.new(18,params:get_id(currentParamID), 3, 17, 1)
-  
-  
+
+
   params:set_action("note_number", function(x) testNumberParamAction("note_number") end)
   params:set_action("grocery list", function(x) testNumberParamAction("grocery list") end)
-  
-  params:append_action("frequency", function() 
+
+  params:append_action("frequency", function()
     print(params:get("frequency") )
-    texts[1].entry = params:get("frequency") 
+    texts[1].entry = params:get("frequency")
         texts[1].dirty = true
     lcdLines[texts[1].line].dirty = true
     pushScreenDirty = true
